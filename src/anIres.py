@@ -1,5 +1,7 @@
 import math
 res=0
+
+
 def anIres(X1,Y1,Z1,a1,lx1,ly1,lz1,X2,Y2,Z2,a2,lx2,ly2,lz2):
     global res
     try:

@@ -1,11 +1,15 @@
 import math
 import numpy as np
+
+
 def equal(A,B,equal_diff=1.0e-6):
     if abs(A-B)<equal_diff:
         value=1
     else:
         value=0
     return value
+
+
 def Afunction(k,p):
     prefac=math.exp(-p)
     mysum=0
@@ -17,6 +21,8 @@ def Afunction(k,p):
         mysum+=nom/denom
     res=prefac*mysum
     return res
+
+
 def Bfunction(k,p,t):
     prefac1=-math.exp(-p*t)
     prefac2=-math.exp(p*t)
@@ -33,15 +39,21 @@ def Bfunction(k,p,t):
         sum2=sum2+u*pow(-1,n)
     res=prefac1*sum1+prefac2*sum2
     return res
+
+
 def pvalue(X1,Y1,Z1,X2,Y2,Z2,mu1,mu2):
     norm=(X1-X2)*(X1-X2)+(Y1-Y2)*(Y1-Y2)+(Z1-Z2)*(Z1-Z2)
     norm=math.sqrt(norm)
     res=0.5*norm*(mu1+mu2)
     return res
+
+
 def tvalue(mu1,mu2):
     res=mu1-mu2
     res=res/(mu1+mu2)
     return res
+
+
 def Smulliken_s_s(p,t,type1,type2):
     res=0
     if type1==1 and type2==1: #1s-1s
@@ -74,7 +86,9 @@ def Smulliken_s_s(p,t,type1,type2):
             res=(1.0/25200.0)*(p*p*p*p*p*p*p)*(35.0*Afunction(6,p)-35.0*Afunction(4,p)+21.0*Afunction(2,p)-5.0*Afunction(0,p))
         else:
             res=(1.0/1440.0)*(p*p*p*p*p*p*p)*pow((1.0-t*t),3.5)*(Afunction(6,p)*Bfunction(0,p,t)-3.0*Afunction(4,p)*Bfunction(2,p,t)+3.0*Afunction(2,p)*Bfunction(4,p,t)-Afunction(0,p)*Bfunction(6,p,t))
-    return res;
+    return res
+
+
 def Smulliken_s_psigma(p,t,type1,type2):
     res=0
     if (type1==1 and (type2>=3 and type2<=5)) or (type2==1 and (type1>=3 and type1<=5)): #1s-2psigma
@@ -107,9 +121,11 @@ def Smulliken_s_psigma(p,t,type1,type2):
             res=(1.0/12600.0)*(1.0/math.sqrt(3.0))*(p*p*p*p*p*p*p)*(35.0*Afunction(5,p)-14.0*Afunction(3,p)+3.0*Afunction(1,p))
         else:
             res=(1.0/480.0)*(1.0/math.sqrt(3.0))*(p*p*p*p*p*p*p)*pow((1.0-t*t),3.5)*(-1.0*Afunction(6,p)*Bfunction(1,p,t)+Afunction(5,p)*(Bfunction(0,p,t)-Bfunction(2,p,t))+Afunction(4,p)*(Bfunction(1,p,t)+2.0*Bfunction(3,p,t))+2.0*Afunction(3,p)*(Bfunction(4,p,t)-Bfunction(2,p,t))-Afunction(2,p)*(2.0*Bfunction(3,p,t)+Bfunction(5,p,t))+Afunction(1,p)*(Bfunction(4,p,t)-Bfunction(6,p,t))+Afunction(0,p)*Bfunction(5,p,t))
-    return res;
+    return res
+
+
 def Smulliken_psigma_psigma(p,t,type1,type2):
-    res=0;
+    res=0
     if(type1>=3 and type1<=5) and (type2>=3 and type2<=5): #2psigma-2psigma
         if equal(t,0.0)==1:
             res=(1.0/120.0)*(p*p*p*p*p)*(5.0*Afunction(4,p)-18.0*Afunction(2,p)+5.0*Afunction(0,p))
@@ -126,6 +142,8 @@ def Smulliken_psigma_psigma(p,t,type1,type2):
         else:
             res=(1.0/480.0)*(p*p*p*p*p*p*p)*pow((1.0-t*t),3.5)*(Afunction(6,p)*Bfunction(2,p,t)-Afunction(4,p)*(Bfunction(0,p,t)+2.0*Bfunction(4,p,t))+Afunction(2,p)*(Bfunction(6,p,t)+2.0*Bfunction(2,p,t))-Afunction(0,p)*Bfunction(4,p,t))
     return res
+
+
 def Smulliken_ppi_ppi(p,t,type1,type2):
     res=0
     if (type1>=3 and type1<=5) and (type2>=3 and type2<=5): #2ppi-2ppi
@@ -144,6 +162,8 @@ def Smulliken_ppi_ppi(p,t,type1,type2):
         else:
             res=(1.0/960.0)*(p*p*p*p*p*p*p)*pow((1.0-t*t),3.5)*(Afunction(6,p)*(Bfunction(0,p,t)-Bfunction(2,p,t))+Afunction(4,p)*(2.0*Bfunction(4,p,t)-Bfunction(0,p,t)-Bfunction(2,p,t))+Afunction(2,p)*(2.0*Bfunction(2,p,t)-Bfunction(4,p,t)-Bfunction(6,p,t))+Afunction(0,p)*(Bfunction(6,p,t)-Bfunction(4,p,t)))
     return res
+
+
 def overlap(X1,Y1,Z1,X2,Y2,Z2,mu1,mu2,type1,type2):
     r=math.sqrt((X1-X2)**2+(Y1-Y2)**2+(Z1-Z2)**2)
     pval=0.5*(mu1+mu2)*r
@@ -507,6 +527,7 @@ def overlap_splines(X1,Y1,Z1,X2,Y2,Z2,mu1,mu2,type1,type2,mu_dict,s_s_mapping,s_
     
     return res
 
+
 def MakeLocalCoordsSystems(X1,Y1,Z1,X2,Y2,Z2):
     equal_diff=1.0e-6
     align=0
@@ -590,6 +611,7 @@ def MakeLocalCoordsSystems(X1,Y1,Z1,X2,Y2,Z2):
     #ex=[-ey[2]*ez[1] + ey[1]*ez[2],ey[2]*ez[0] - ey[0]*ez[2],-ey[1]*ez[0] + ey[0]*ez[1]]
     #return ex,ey,[-ez[0],ez[1],ez[2]]
     return [-ey2*ez1 + ey1*ez2,ey2*ez0 - ey0*ez2,-ey1*ez0 + ey0*ez1],[ey0,ey1,ey2],[-ez0,-ez1,-ez2]
+
 
 def MakeLocalCoordsSystemsOld(X1,Y1,Z1,X2,Y2,Z2):
     align=0

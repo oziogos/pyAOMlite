@@ -754,6 +754,8 @@ def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict)
 def projection_reg_test(ref_data,STO_proj_dict,rtol=1.0e-6,atol=1.0e-6):
     test_data={i:{} for i in ref_data.keys()}
     total=len(test_data.keys())
+    passed=0
+    total_time=0
     for counter,(key,value) in enumerate(ref_data.items()):
         tar = tarfile.open(value['cp2k_output_archive'])
         cp2k_out=value["cp2k_output_archive"].split(".tgz")[0]+'.out'
@@ -768,6 +770,7 @@ def projection_reg_test(ref_data,STO_proj_dict,rtol=1.0e-6,atol=1.0e-6):
         toc=time.perf_counter()
         os.system(f'rm {cp2k_out}')
         test_data[key]['test_time']=toc-tic
+        total_time+=test_data[key]['test_time']
         test_data[key]['test']=mymol.state
         check=[]
         check.append(np.allclose(test_data[key]['test']['pvecs']['px'],ref_data[key]['reference']['pvecs']['px'],rtol=rtol, atol=atol))
@@ -781,7 +784,12 @@ def projection_reg_test(ref_data,STO_proj_dict,rtol=1.0e-6,atol=1.0e-6):
         check.append(np.allclose(list(test_data[key]['test']['compl_dict'].values()),list(ref_data[key]['reference']['compl_dict'].values()),rtol=rtol, atol=atol))
         print(f'[{counter+1}/{total}] ',end='')
         if check==[True for i in check]:
-            print(f'PASS\t{key}\t{test_data[key]["test_time"]:0.2f}s')
+            print(f'PASS\t{key}\t{test_data[key]["test_time"]:.2f}s')
+            test_data[key]['test_status']='PASS'
+            passed+=1
         else:
-            print(f'! FAIL\t{key}\t{test_data[key]["test_time"]:0.2f}s')
+            print(f'! FAIL\t{key}\t{test_data[key]["test_time"]:.2f}s')
+            test_data[key]['test_status']='FAIL'
+    print(f'Total tests: {total}; passed: {passed}/{total}; failed {total-passed}/{total}')
+    print(f'Execution time: {total_time:.2f}s')
     return test_data

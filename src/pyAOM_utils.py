@@ -4,6 +4,8 @@ import math
 import pandas as pd
 import sys
 import ast
+import tarfile
+import time
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 from mulliken import *
 from anIres import *
@@ -161,7 +163,7 @@ class single_molecule:
     def save_AOM(self,label):
         with open(f'output/{label}/AOM_COEFF.dat',mode='w') as fp:
             print(self.AOM_dict,file=fp)
-    def save_state(self,label):
+    def save_state(self,label,to_file=True):
         self.state['pvecs']={'px':list(self.px),'py':list(self.py),'pz':list(self.pz)}
         self.state['S_matrix']=[[j for j in i] for i in self.Smatrix]
         self.state['AOM_dict']=self.AOM_dict
@@ -170,8 +172,9 @@ class single_molecule:
         self.state['STO_matrix']=self.STO_matrix
         _,s,_=np.linalg.svd(self.Smatrix)
         self.state['singular_values']=list(s)
-        with open(f'output/{label}/state.dat',mode='w') as fp:
-            print(self.state,file=fp)
+        if to_file==True:
+            with open(f'output/{label}/state.dat',mode='w') as fp:
+                print(self.state,file=fp)
 
 def read_xyz(filename):
     fp=open(filename,mode='r')
@@ -747,3 +750,38 @@ def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict)
                     frag1.STO_mu_array+frag2.STO_mu_array,
                     STO_matrix_f1+STO_matrix_f2)
     return Sab
+
+def projection_reg_test(ref_data,STO_proj_dict,rtol=1.0e-6,atol=1.0e-6):
+    test_data={i:{} for i in ref_data.keys()}
+    total=len(test_data.keys())
+    for counter,(key,value) in enumerate(ref_data.items()):
+        tar = tarfile.open(value['cp2k_output_archive'])
+        cp2k_out=value["cp2k_output_archive"].split(".tgz")[0]+'.out'
+        tar.extractall()
+        tar.close()
+        tic=time.perf_counter()
+        mymol=single_molecule(value['xyz'])
+        mymol.get_cp2k_info(value['MO'],cp2k_out,'../cp2k_files/GTH_BASIS_SETS','DZVP-GTH')
+        mymol.initialize_STOs(STO_proj_dict)
+        mymol.project()
+        mymol.save_state(key,to_file=False)
+        toc=time.perf_counter()
+        os.system(f'rm {cp2k_out}')
+        test_data[key]['test_time']=toc-tic
+        test_data[key]['test']=mymol.state
+        check=[]
+        check.append(np.allclose(test_data[key]['test']['pvecs']['px'],ref_data[key]['reference']['pvecs']['px'],rtol=rtol, atol=atol))
+        check.append(np.allclose(test_data[key]['test']['pvecs']['py'],ref_data[key]['reference']['pvecs']['py'],rtol=rtol, atol=atol))
+        check.append(np.allclose(test_data[key]['test']['pvecs']['pz'],ref_data[key]['reference']['pvecs']['pz'],rtol=rtol, atol=atol))
+        check.append(np.allclose(test_data[key]['test']['S_matrix'],ref_data[key]['reference']['S_matrix'],rtol=rtol, atol=atol))
+        check.append(np.allclose(test_data[key]['test']['V_array'],ref_data[key]['reference']['V_array'],rtol=rtol, atol=atol))
+        check.append(np.allclose(test_data[key]['test']['STO_matrix'],ref_data[key]['reference']['STO_matrix'],rtol=rtol, atol=atol))
+        check.append(np.allclose(test_data[key]['test']['singular_values'],ref_data[key]['reference']['singular_values'],rtol=rtol, atol=atol))
+        check.append(np.allclose(list(test_data[key]['test']['AOM_dict'].values()),list(ref_data[key]['reference']['AOM_dict'].values()),rtol=rtol, atol=atol))
+        check.append(np.allclose(list(test_data[key]['test']['compl_dict'].values()),list(ref_data[key]['reference']['compl_dict'].values()),rtol=rtol, atol=atol))
+        print(f'[{counter+1}/{total}] ',end='')
+        if check==[True for i in check]:
+            print(f'PASS\t{key}\t{test_data[key]["test_time"]:0.2f}s')
+        else:
+            print(f'! FAIL\t{key}\t{test_data[key]["test_time"]:0.2f}s')
+    return test_data

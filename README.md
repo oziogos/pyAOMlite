@@ -1,2 +1,2 @@
 # pyAOMlite
-A lite version on the pyAOM project
+A lite version of the pyAOM project

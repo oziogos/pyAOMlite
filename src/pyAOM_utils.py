@@ -683,11 +683,14 @@ def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict)
             data=fp.read()
             frag2_AOM_dict=ast.literal_eval(data)
     frag1atoms=len(frag1_AOM_dict[frag1_MO])
-    fp=open(dimer_xyz_file)
-    data=fp.readlines()
-    fp.close()
-    x,y,z=[[float(i.split()[j]) for i in data[2::]] for j in [1,2,3]]
-    species=[i.split()[0] for i in data[2::]]
+    if isinstance(dimer_xyz_file,str):
+        fp=open(dimer_xyz_file)
+        data=fp.readlines()
+        fp.close()
+        x,y,z=[[float(i.split()[j]) for i in data[2::]] for j in [1,2,3]]
+        species=[i.split()[0] for i in data[2::]]
+    elif isinstance(dimer_xyz_file,tuple):
+        species,x,y,z=dimer_xyz_file
     atoms=len(species)
     frag2atoms=atoms-frag1atoms
     frag1=single_molecule(None,'variable',[species[0:frag1atoms],x[0:frag1atoms],y[0:frag1atoms],z[0:frag1atoms]])
@@ -798,5 +801,52 @@ def projection_reg_test(ref_data_init,STO_proj_dict,rtol=1.0e-3,atol=1.0e-6,targ
             print(f'! FAIL\t{key}\t{test_data[key]["test_time"]:.2f}s')
             test_data[key]['test_status']='FAIL'
     print(f'Total tests: {total}; passed: {passed}/{total}; failed {total-passed}/{total}')
+    print(f'Execution time: {total_time:.2f}s')
+    return test_data
+
+def overlap_reg_test(ref_data_init,AOM_dict,atol=1.0e-6,target=None):
+    if target is None:
+        ref_data=ref_data_init
+    else:
+        ref_data={}
+        for key,value in ref_data_init.items():
+            if key in target:
+                ref_data[key]=value
+    test_data={i:{} for i in ref_data.keys()}
+    total=len(test_data.keys())
+    passed=0
+    total_time=0
+    total_dimers=0
+    for counter,(key,value) in enumerate(ref_data.items()):
+        test_data[key]['dimers']={}
+        tic=time.perf_counter()
+        test_status='PASS'
+        for dimer in value['dimers'].keys():
+            val=Sab((value['dimers'][dimer]['species'],value['dimers'][dimer]['x'],value['dimers'][dimer]['y'],value['dimers'][dimer]['z']),
+                    {int(i):j for i,j in value['AOM_dict'].items()},
+                    {int(i):j for i,j in value['AOM_dict'].items()},
+                    int(list(value['AOM_dict'].keys())[0]),
+                    int(list(value['AOM_dict'].keys())[0]),
+                    AOM_dict)
+            test_data[key]['dimers'][dimer]={'test_Sab':val}
+            if abs(val-value['dimers'][dimer]['reference_Sab'])<atol:
+                status='PASS'
+            else:
+                status='FAIL'
+                test_status='FAIL'
+            test_data[key]['dimers'][dimer]['test_status']=status
+        toc=time.perf_counter()
+        test_data[key]['test_time']=toc-tic
+        test_data[key]['test_status']=test_status
+        total_time+=test_data[key]['test_time']
+        print(f'[{counter+1}/{total}] ',end='')
+        if test_status=='PASS':
+            print(f'PASS\t{key}\tdimers: {len(test_data[key]["dimers"])}\t{test_data[key]["test_time"]:.2f}s')
+            passed+=1
+        else:
+            print(f'! FAIL\t{key}\tdimers: {len(test_data[key]["dimers"])}\t{test_data[key]["test_time"]:.2f}s')
+        total_dimers+=len(test_data[key]["dimers"])
+    print(f'Total tests: {total}; passed: {passed}/{total}; failed {total-passed}/{total}')
+    print(f'Total dimers: {total_dimers}')
     print(f'Execution time: {total_time:.2f}s')
     return test_data

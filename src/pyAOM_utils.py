@@ -710,15 +710,15 @@ def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict)
     for ci,i in enumerate(STO_matrix_f1):
         for j in range(1,3+1):
             STO_matrix_f1[ci][j]/=math.sqrt(abs(S_f1))
-    S_f1_norm=AOM_overlap_calculation(0,frag1.STOs,
-                    0,frag1.STOs,
-                    frag1.x+frag2.x,
-                    frag1.y+frag2.y,
-                    frag1.z+frag2.z,
-                    frag1.STO_id_array+[i+frag1atoms for i in frag2.STO_id_array],
-                    frag1.STO_type_array+frag2.STO_type_array,
-                    frag1.STO_mu_array+frag2.STO_mu_array,
-                    STO_matrix_f1+STO_matrix_f2)      
+#     S_f1_norm=AOM_overlap_calculation(0,frag1.STOs,
+#                     0,frag1.STOs,
+#                     frag1.x+frag2.x,
+#                     frag1.y+frag2.y,
+#                     frag1.z+frag2.z,
+#                     frag1.STO_id_array+[i+frag1atoms for i in frag2.STO_id_array],
+#                     frag1.STO_type_array+frag2.STO_type_array,
+#                     frag1.STO_mu_array+frag2.STO_mu_array,
+#                     STO_matrix_f1+STO_matrix_f2)      
     S_f2=AOM_overlap_calculation(frag1.STOs,frag1.STOs+frag2.STOs,
                     frag1.STOs,frag1.STOs+frag2.STOs,
                     frag1.x+frag2.x,
@@ -731,15 +731,15 @@ def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict)
     for ci,i in enumerate(STO_matrix_f2):
         for j in range(1,3+1):
             STO_matrix_f2[ci][j]/=math.sqrt(abs(S_f2))
-    S_f2_norm=AOM_overlap_calculation(frag1.STOs,frag1.STOs+frag2.STOs,
-                    frag1.STOs,frag1.STOs+frag2.STOs,
-                    frag1.x+frag2.x,
-                    frag1.y+frag2.y,
-                    frag1.z+frag2.z,
-                    frag1.STO_id_array+[i+frag1atoms for i in frag2.STO_id_array],
-                    frag1.STO_type_array+frag2.STO_type_array,
-                    frag1.STO_mu_array+frag2.STO_mu_array,
-                    STO_matrix_f1+STO_matrix_f2)  
+#     S_f2_norm=AOM_overlap_calculation(frag1.STOs,frag1.STOs+frag2.STOs,
+#                     frag1.STOs,frag1.STOs+frag2.STOs,
+#                     frag1.x+frag2.x,
+#                     frag1.y+frag2.y,
+#                     frag1.z+frag2.z,
+#                     frag1.STO_id_array+[i+frag1atoms for i in frag2.STO_id_array],
+#                     frag1.STO_type_array+frag2.STO_type_array,
+#                     frag1.STO_mu_array+frag2.STO_mu_array,
+#                     STO_matrix_f1+STO_matrix_f2)  
     Sab=AOM_overlap_calculation(0,frag1.STOs,
                     frag1.STOs,frag1.STOs+frag2.STOs,
                     frag1.x+frag2.x,
@@ -751,7 +751,14 @@ def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict)
                     STO_matrix_f1+STO_matrix_f2)
     return Sab
 
-def projection_reg_test(ref_data,STO_proj_dict,rtol=1.0e-6,atol=1.0e-6):
+def projection_reg_test(ref_data_init,STO_proj_dict,rtol=1.0e-3,atol=1.0e-6,target=None):
+    if target is None:
+        ref_data=ref_data_init
+    else:
+        ref_data={}
+        for key,value in ref_data_init.items():
+            if key in target:
+                ref_data[key]=value
     test_data={i:{} for i in ref_data.keys()}
     total=len(test_data.keys())
     passed=0

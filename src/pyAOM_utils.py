@@ -1,16 +1,16 @@
 import os
-import numpy as np
-import math
 import pandas as pd
-import sys
 import ast
 import tarfile
 import time
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from mulliken import *
-from anIres import *
+import math
+import numpy as np
+from .mulliken import *
+from .anIres import *
+
 
 class single_molecule:
+
     def __init__(self,filename,src='file',input_var=None):
         if src=='file':
             self.atoms,self.species,self.x,self.y,self.z=read_xyz(filename)
@@ -22,6 +22,7 @@ class single_molecule:
         self.AOM_dict={}
         self.orb_compl_dict={}
         self.state={}
+
     def angtobohr(self):
         AngToBohr=1.8897259886
         if self.dist_unit=='Ang':
@@ -29,6 +30,7 @@ class single_molecule:
             self.y=[i*AngToBohr for i in self.y]
             self.z=[i*AngToBohr for i in self.z]
             self.dist_unit='Bohr'
+
     def bohrtoang(self):
         AngToBohr=1.8897259886
         if self.dist_unit=='Bohr':
@@ -36,8 +38,10 @@ class single_molecule:
             self.y=[i/AngToBohr for i in self.y]
             self.z=[i/AngToBohr for i in self.z]
             self.dist_unit='Ang'
+
     def calculate_geom_center(self):
         self.X,self.Y,self.Z=[np.array(self.x).mean(),np.array(self.y).mean(),np.array(self.z).mean()]
+
     def recenter(self,offset=4.0):
         self.calculate_geom_center()
         R=[max(self.x)-min(self.x)+2.0*offset,max(self.y)-min(self.y)+2.0*offset,max(self.z)-min(self.z)+2.0*offset]
@@ -46,6 +50,7 @@ class single_molecule:
         self.z=[i-self.Z+R[2]/2 for i in self.z]
         self.calculate_geom_center()
         self.supercell=[R[i] for i in range(3)]
+
     def prep_cp2k_single(self,configuration_dict,label,template,basis,potential):
         #
         self.recenter()
@@ -90,15 +95,18 @@ class single_molecule:
             for i in qs:
                 print(i,end='',file=fp)
         print(f'Generated {path}/{configuration_dict["PROJECT_NAME"]}.inp')
+
     def get_cp2k_info(self,MO,cp2k_output_file,cp2k_basis_file,basis):
         self.MO=MO
         self.MOcoeffs=get_cp2k_MO(cp2k_output_file,MO)
         self.basis_dict=read_basis(cp2k_basis_file,basis,self.unique_species)
         self.pcoeff,self.palpha,self.pqn,self.bfnPerAtom,self.GTO_depth=read_CP2K_GTOs(self.species,self.basis_dict)
+
     def initialize_STOs(self,STO_dict):
         self.angtobohr()
         self.STOs,self.STO_id_array,self.STO_type_array,self.STO_mu_array=initialize_STOs(self.species,self.x,self.y,self.z,STO_dict)
         self.Smatrix=calculate_overlap_S_matrix(self.x,self.y,self.z,self.STOs,self.STO_id_array,self.STO_type_array,self.STO_mu_array)
+
     def resolve_pvecs(self,STO_matrix=None):
         """Calculate normal vectors. If the STO matrix is given as input, calculate pi projection coeffs"""
         # convert ang to bohr
@@ -150,6 +158,7 @@ class single_molecule:
             self.px[atomlist[i]],self.py[atomlist[i]],self.pz[atomlist[i]]=u
         if STO_matrix is not None:
             return [self.px[j]*i[1]+self.py[j]*i[2]+self.pz[j]*i[3] for j,i in enumerate(STO_matrix)]
+
     def project(self):
         self.STO_matrix,self.orb_compl,self.V_array=STO_GTO_projection(self.x,self.y,self.z,
                                         self.STO_id_array,self.STO_type_array,self.STO_mu_array,
@@ -158,11 +167,14 @@ class single_molecule:
         self.AOM_pi_coeffs=[self.px[c]*i[1]+self.py[c]*i[2]+self.pz[c]*i[3] for c,i in enumerate(self.STO_matrix)]
         self.AOM_dict[self.MO]=self.AOM_pi_coeffs
         self.orb_compl_dict[self.MO]=self.orb_compl
+
     def cube_preview(self,STO_dict,filename):
         create_cube_file(self.species,self.x,self.y,self.z,self.STO_matrix,STO_dict,filename)
+
     def save_AOM(self,label):
         with open(f'output/{label}/AOM_COEFF.dat',mode='w') as fp:
             print(self.AOM_dict,file=fp)
+
     def save_state(self,label,to_file=True):
         self.state['pvecs']={'px':list(self.px),'py':list(self.py),'pz':list(self.pz)}
         self.state['S_matrix']=[[j for j in i] for i in self.Smatrix]
@@ -176,6 +188,7 @@ class single_molecule:
             with open(f'output/{label}/state.dat',mode='w') as fp:
                 print(self.state,file=fp)
 
+
 def read_xyz(filename):
     fp=open(filename,mode='r')
     xyz=fp.readlines()
@@ -183,6 +196,8 @@ def read_xyz(filename):
     x,y,z=[[float(i.split()[j]) for i in xyz[2::]] for j in [1,2,3]]
     species=[i.split()[0] for i in xyz[2::]]
     return len(species),species,x,y,z
+
+
 def get_cp2k_MO(filename,MO,report=False):
     # open cp2k output file and store MO info: alpha channel
     fp=open(filename,mode='r')
@@ -221,10 +236,12 @@ def get_cp2k_MO(filename,MO,report=False):
         return MOcoeffs
     else:
         return MOcoeffs,alphaMOs
+
+
 def read_basis(filename,basis,unique_species,debug=0):
     fp=open(filename,mode='r')
     cp2k_basis_sets=fp.readlines()
-    fp.close
+    fp.close()
 
     basis_dict={}
 
@@ -288,6 +305,8 @@ def read_basis(filename,basis,unique_species,debug=0):
             if basis_dict[element][i+1]['m']==-2:
                 basis_dict[element]['CGTOs']+=1
     return basis_dict
+
+
 def read_CP2K_GTOs(species,basis_dict):
     atoms=len(species)
     GTOs=sum([basis_dict[i]['GTOs'] for i in species])
@@ -345,6 +364,8 @@ def read_CP2K_GTOs(species,basis_dict):
                     for l in basis_dict[i][j+1]['alpha']:
                         pqn.append([0,0,2])
     return pcoeff,palpha,pqn,bfnPerAtom,GTO_depth
+
+
 def initialize_STOs(species,x,y,z,STO_dict,debug=0):
     one_species=[]
     two_species=[]
@@ -419,6 +440,8 @@ def initialize_STOs(species,x,y,z,STO_dict,debug=0):
         for j,i in enumerate(STO_id_array):
             print(f'[{i}]\t{j+1}\t{STO_type_string[STO_type_array[j]]}\t{STO_mu_array[j]}\t{STO_type_array[j]}')
     return STOs,STO_id_array,STO_type_array,STO_mu_array
+
+
 def calculate_overlap_S_matrix(x,y,z,STOs,STO_id_array,STO_type_array,STO_mu_array):
     Smatrix=np.identity(STOs)
 
@@ -426,9 +449,10 @@ def calculate_overlap_S_matrix(x,y,z,STOs,STO_id_array,STO_type_array,STO_mu_arr
         for j in range(STOs):
             if STO_id_array[i]!=STO_id_array[j]:
                 Smatrix[i][j]=overlap(x[STO_id_array[i]-1],y[STO_id_array[i]-1],z[STO_id_array[i]-1],x[STO_id_array[j]-1],y[STO_id_array[j]-1],z[STO_id_array[j]-1],STO_mu_array[i],STO_mu_array[j],STO_type_array[i],STO_type_array[j])
-    
-    
+
     return Smatrix
+
+
 def STO_GTO_projection(x,y,z,STO_id_array,STO_type_array,STO_mu_array,pcoeff,palpha,pqn,bfnPerAtom,GTO_depth,MOcoeffs,Smatrix):
     projection_dict={
         1:{
@@ -536,6 +560,21 @@ def STO_GTO_projection(x,y,z,STO_id_array,STO_type_array,STO_mu_array,pcoeff,pal
         else:
             STO_matrix[STO_id_array[i]-1][(STO_type_array[i]-2)%4]=res[i]
     return STO_matrix,orb_compl,V_array
+
+
+def resolve_STO_matrix(atoms,STOs,STO_id_array,STO_type_array,px,py,pz,AOM_array):
+    STO_matrix=[[0,0,0,0] for i in range(atoms)]
+    for i in range(STOs):
+        if STO_type_array[i]==1:
+            STO_matrix[STO_id_array[i]-1][0]=0
+        else:
+            STO_matrix[STO_id_array[i]-1][0]=0
+            STO_matrix[STO_id_array[i]-1][1]=px[STO_id_array[i]-1]*AOM_array[STO_id_array[i]-1]
+            STO_matrix[STO_id_array[i]-1][2]=py[STO_id_array[i]-1]*AOM_array[STO_id_array[i]-1]
+            STO_matrix[STO_id_array[i]-1][3]=pz[STO_id_array[i]-1]*AOM_array[STO_id_array[i]-1]
+    return STO_matrix
+
+
 def create_cube_file(species,x,y,z,STO_matrix,STO_dict,filename='test.cube',cube_grid=0.5,offset=5.0,print_thres=1.0e-20):
     def atomic_contrib(x,y,z,X,Y,Z,species,line,STO_matrix,STO_dict):
         c1s,c2s,c2px,c2py,c2pz,c3s,c3px,c3py,c3pz=[0 for i in range(9)]
@@ -589,69 +628,7 @@ def create_cube_file(species,x,y,z,STO_matrix,STO_dict,filename='test.cube',cube
                         print(file=fp)
                 print(file=fp)
 
-def resolve_STO_matrix(atoms,STOs,STO_id_array,STO_type_array,px,py,pz,AOM_array):
-    STO_matrix=[[0,0,0,0] for i in range(atoms)]
-    for i in range(STOs):
-        if STO_type_array[i]==1:
-            STO_matrix[STO_id_array[i]-1][0]=0
-        else:
-            STO_matrix[STO_id_array[i]-1][0]=0
-            STO_matrix[STO_id_array[i]-1][1]=px[STO_id_array[i]-1]*AOM_array[STO_id_array[i]-1]
-            STO_matrix[STO_id_array[i]-1][2]=py[STO_id_array[i]-1]*AOM_array[STO_id_array[i]-1]
-            STO_matrix[STO_id_array[i]-1][3]=pz[STO_id_array[i]-1]*AOM_array[STO_id_array[i]-1]
-    return STO_matrix
-def create_cube_file(species,x,y,z,STO_matrix,STO_dict,filename='test.cube',cube_grid=0.5,offset=5.0,print_thres=1.0e-20):
-    def atomic_contrib(x,y,z,X,Y,Z,species,line,STO_matrix,STO_dict):
-        c1s,c2s,c2px,c2py,c2pz,c3s,c3px,c3py,c3pz=[0 for i in range(9)]
-        mu1s,mu2s,mu2p,mu3s,mu3p=[0 for i in range(5)]
-        if '1s' in STO_dict[species]:
-            c1s=STO_matrix[line][0]
-            mu1s=STO_dict[species]['1s']
-        if '2s' in STO_dict[species]:
-            c2s,c2px,c2py,c2pz=[i for i in STO_matrix[line]]
-            mu2s=STO_dict[species]['2s']
-            mu2p=STO_dict[species]['2p']
-        if '3s' in STO_dict[species]:
-            c3s,c3px,c3py,c3pz=STO_matrix[line]
-            mu3s=STO_dict[species]['3s']
-            mu3p=STO_dict[species]['3p']
-        R=math.sqrt((x-X)**2+(y-Y)**2+(z-Z)**2)
-        res=(0.5641895835477563*c1s*mu1s**1.5)/math.exp(mu1s*R) \
-        + (0.32573500793527993*c2s*mu2s**2.5*R)/math.exp(mu2s*R) \
-        + (0.11894160774351806*c3s*mu3s**3.5*R*R)/math.exp(mu3s*R) \
-        + (0.5641895835477563*mu2p**2.5*(c2px*(x - X) + c2py*(y - Y) + c2pz*(z - Z)))/math.exp(mu2p*R) \
-        + (0.20601290774570113*mu3p**3.5*R*(c3px*(x - X) + c3py*(y - Y) + c3pz*(z - Z)))/math.exp(mu3p*R)
-        return res
-    atoms=len(species)
-    xmin,ymin,zmin=[min(i)-offset for i in [x,y,z]]
-    xmax,ymax,zmax=[max(i)+offset for i in [x,y,z]]
-    resx,resy,resz=[int((xmax-xmin)/cube_grid+1),int((ymax-ymin)/cube_grid+1),int((zmax-zmin)/cube_grid+1)]
-    with open(filename,mode='w') as fp:
-        print('My CUBE\n',file=fp)
-        print(f'{atoms}\t{xmin}\t{ymin}\t{zmin}',file=fp)
-        print(f'{resx}\t{cube_grid}\t{0.0}\t{0.0}',file=fp)
-        print(f'{resy}\t{0.0}\t{cube_grid}\t{0.0}',file=fp)
-        print(f'{resz}\t{0.0}\t{0.0}\t{cube_grid}',file=fp)
-        species_dict={'H':1,'C':6,'N':7,'O':8,'F':9,'S':16}
-        for j,i in enumerate(species):
-            print(f'{species_dict[i]}\t{float(species_dict[i]):>.2}\t{x[j]}\t{y[j]}\t{z[j]}',file=fp)
-        for ix in range(resx):
-            for iy in range(resy):
-                for iz in range(resz):
-                    X,Y,Z=[xmin+ix*cube_grid,ymin+iy*cube_grid,zmin+iz*cube_grid]
-                    mysum=0
-                    for i in range(atoms):
-                        mysum+=atomic_contrib(X,Y,Z,x[i],y[i],z[i],species[i],i,STO_matrix,STO_dict)
-                    if mysum**2>print_thres:
-                        if mysum<0.0:
-                            print(f'{mysum**2:>.2} ',end='',file=fp)
-                        else:
-                            print(f'{-mysum**2:>.2} ',end='',file=fp)
-                    else:
-                        print('0.0 ',end='',file=fp)
-                    if iz % 6 == 5:
-                        print(file=fp)
-                print(file=fp)
+
 def AOM_overlap_calculation(istart,istop,jstart,jstop,x,y,z,STO_id_array,STO_type_array,STO_mu_array,STO_matrix):
     S=0
     for i in range(istart,istop):
@@ -669,6 +646,8 @@ def AOM_overlap_calculation(istart,istop,jstart,jstop,x,y,z,STO_id_array,STO_typ
                     if STO_type_array[i]==STO_type_array[j]:
                         S=S+STO_matrix[STO_id_array[i]-1][locali]*STO_matrix[STO_id_array[j]-1][localj]
     return S
+
+
 def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict):
     if isinstance(frag1_AOM_file,dict)==True:
         frag1_AOM_dict=frag1_AOM_file
@@ -721,7 +700,7 @@ def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict)
 #                     frag1.STO_id_array+[i+frag1atoms for i in frag2.STO_id_array],
 #                     frag1.STO_type_array+frag2.STO_type_array,
 #                     frag1.STO_mu_array+frag2.STO_mu_array,
-#                     STO_matrix_f1+STO_matrix_f2)      
+#                     STO_matrix_f1+STO_matrix_f2)
     S_f2=AOM_overlap_calculation(frag1.STOs,frag1.STOs+frag2.STOs,
                     frag1.STOs,frag1.STOs+frag2.STOs,
                     frag1.x+frag2.x,
@@ -742,7 +721,7 @@ def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict)
 #                     frag1.STO_id_array+[i+frag1atoms for i in frag2.STO_id_array],
 #                     frag1.STO_type_array+frag2.STO_type_array,
 #                     frag1.STO_mu_array+frag2.STO_mu_array,
-#                     STO_matrix_f1+STO_matrix_f2)  
+#                     STO_matrix_f1+STO_matrix_f2)
     Sab=AOM_overlap_calculation(0,frag1.STOs,
                     frag1.STOs,frag1.STOs+frag2.STOs,
                     frag1.x+frag2.x,
@@ -753,6 +732,7 @@ def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict)
                     frag1.STO_mu_array+frag2.STO_mu_array,
                     STO_matrix_f1+STO_matrix_f2)
     return Sab
+
 
 def projection_reg_test(ref_data_init,STO_proj_dict,rtol=1.0e-3,atol=1.0e-6,target=None):
     if target is None:

@@ -12,4 +12,4 @@
 
 -------------------------------------------------------------------------------- */
 
-double anIres(double X1,double Y1,double Z1,double a1,int lx1,int ly1,int lz1,double X2,double Y2,double Z2,double a2,int lx2,int ly2,int lz2);
+double anIres_func(double X1,double Y1,double Z1,double a1,int lx1,int ly1,int lz1,double X2,double Y2,double Z2,double a2,int lx2,int ly2,int lz2);

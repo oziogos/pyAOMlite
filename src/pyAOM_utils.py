@@ -2,13 +2,12 @@ import os
 import numpy as np
 import math
 import pandas as pd
-import sys
 import ast
 import tarfile
 import time
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from mulliken import *
-from anIres import *
+from .mulliken import overlap
+from .anIres import anIres
+
 
 class single_molecule:
     def __init__(self,filename,src='file',input_var=None):

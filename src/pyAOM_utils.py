@@ -5,6 +5,7 @@ import tarfile
 import time
 import math
 import numpy as np
+from scipy.spatial import cKDTree as KDTree
 from .anIres import anIres
 from .aom_overlap import AOM_overlap_calculation
 from .aom_overlap import calculate_overlap_S_matrix
@@ -128,18 +129,24 @@ class single_molecule:
             if i!='H':
                 aoinum+=1
                 atomlist.append(j)
+
+        coordinates = np.hstack([
+            np.array(self.x)[:, None], np.array(self.y)[:, None],
+            np.array(self.z)[:, None]
+        ])
+        tree = KDTree(coordinates)
+        query = tree.query_ball_point(coordinates, r=3.5)
+
         for i in range(len(atomlist)):
             neighbourlist=[[0 for j in range(4)] for i in range(4)]
             j=0
-            for k in range(self.atoms):
-                if atomlist[i]!=k:
-                    r=np.linalg.norm(np.array([self.x[atomlist[i]],self.y[atomlist[i]],self.z[atomlist[i]]])-np.array([self.x[k],self.y[k],self.z[k]]))
-                    if r<3.5:
-                        neighbourlist[0][j]=k+1
-                        neighbourlist[1][j]=self.x[k]
-                        neighbourlist[2][j]=self.y[k]
-                        neighbourlist[3][j]=self.z[k]
-                        j+=1
+            for k in sorted(query[atomlist[i]]):
+                if atomlist[i] != k:
+                    neighbourlist[0][j]=k+1
+                    neighbourlist[1][j]=self.x[k]
+                    neighbourlist[2][j]=self.y[k]
+                    neighbourlist[3][j]=self.z[k]
+                    j+=1
             if j==2:
                 neighbourlist[0][2]=atomlist[i]+1
                 neighbourlist[1][2]=self.x[atomlist[i]]
@@ -151,20 +158,21 @@ class single_molecule:
                 neighbourlist[1][1]=self.x[atomlist[i]]
                 neighbourlist[2][1]=self.y[atomlist[i]]
                 neighbourlist[3][1]=self.z[atomlist[i]]
-                for k in range(self.atoms):
+                for k in sorted(query[neighbourlist[0][0] - 1]):
                     if neighbourlist[0][0]!=k+1 and neighbourlist[0][1]!=k+1:
-                        r=np.linalg.norm(np.array([self.x[neighbourlist[0][0]-1],self.y[neighbourlist[0][0]-1],self.z[neighbourlist[0][0]-1]])-np.array([self.x[k],self.y[k],self.z[k]]))
-                        if r<3.5:
-                            neighbourlist[0][2]=k+1
-                            neighbourlist[1][2]=self.x[k]
-                            neighbourlist[2][2]=self.y[k]
-                            neighbourlist[3][2]=self.z[k]
-                            break
+                        neighbourlist[0][2]=k+1
+                        neighbourlist[1][2]=self.x[k]
+                        neighbourlist[2][2]=self.y[k]
+                        neighbourlist[3][2]=self.z[k]
+                        break
             veca_x,veca_y,veca_z=[neighbourlist[i][0]-neighbourlist[i][2] for i in [1,2,3]]
             vecb_x,vecb_y,vecb_z=[neighbourlist[i][1]-neighbourlist[i][2] for i in [1,2,3]]
-            u=np.cross([veca_x,veca_y,veca_z],[vecb_x,vecb_y,vecb_z])
-            u/=np.linalg.norm(u)
-            self.px[atomlist[i]],self.py[atomlist[i]],self.pz[atomlist[i]]=u
+            u_x = veca_y * vecb_z - veca_z * vecb_y
+            u_y = veca_z * vecb_x - veca_x * vecb_z
+            u_z = veca_x * vecb_y - veca_y * vecb_x
+            mag_u = (u_x**2 + u_y**2 + u_z**2)**0.5
+            u = u_x / mag_u, u_y / mag_u, u_z / mag_u
+            self.px[atomlist[i]],self.py[atomlist[i]],self.pz[atomlist[i]] = u
         if STO_matrix is not None:
             return [self.px[j]*i[1]+self.py[j]*i[2]+self.pz[j]*i[3] for j,i in enumerate(STO_matrix)]
 

@@ -45,7 +45,7 @@ cdef inline double[:,:] _calculate_overlap_S_matrix(
     cdef int i, j
     for i in range(STOs):
         for j in range(STOs):
-            if STO_id_array[i]!=STO_id_array[j]:
+            if STO_id_array[i]!=STO_id_array[j] and i <= j:
                 Smatrix[i, j] = overlap(x[STO_id_array[i]-1],y[STO_id_array[i]-1],z[STO_id_array[i]-1],x[STO_id_array[j]-1],y[STO_id_array[j]-1],z[STO_id_array[j]-1],STO_mu_array[i],STO_mu_array[j],STO_type_array[i],STO_type_array[j])
 
     return Smatrix
@@ -64,5 +64,7 @@ def calculate_overlap_S_matrix(
     double[:] x, double[:] y, double[:] z, int STOs, int[:] STO_id_array,
         int[:] STO_type_array, double[:] STO_mu_array
 ):
-    return _calculate_overlap_S_matrix(x, y, z, STOs, STO_id_array,
-        STO_type_array, STO_mu_array)
+    s_matrix = np.array(_calculate_overlap_S_matrix(
+        x, y, z, STOs, STO_id_array, STO_type_array, STO_mu_array
+    ))
+    return s_matrix + s_matrix.T - np.diag(np.diag(s_matrix))

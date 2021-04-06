@@ -240,7 +240,6 @@ def get_cp2k_MO(filename,MO,report=False):
                 basis_info_block.append(' '.join(c[0:4]))
             del c[0:4]
             frames[i].append(c)
-    [i for i in frames[0]]
     alpha_records=[]
     for i in range(3,len(frames[0])):
         line=[]
@@ -252,7 +251,7 @@ def get_cp2k_MO(filename,MO,report=False):
     if report==False:
         return MOcoeffs
     else:
-        return MOcoeffs,alphaMOs
+        return MOcoeffs,basis_info_block
 
 
 def read_basis(filename,basis,unique_species,debug=0):

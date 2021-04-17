@@ -624,9 +624,9 @@ def create_cube_file(species,x,y,z,STO_matrix,STO_dict,filename='test.cube',cube
                         mysum+=atomic_contrib(X,Y,Z,x[i],y[i],z[i],species[i],i,STO_matrix,STO_dict)
                     if mysum**2>print_thres:
                         if mysum<0.0:
-                            print(f'{mysum**2:>.2} ',end='',file=fp)
+                            print(f'{-abs(mysum):>.2} ',end='',file=fp)
                         else:
-                            print(f'{-mysum**2:>.2} ',end='',file=fp)
+                            print(f'{abs(mysum):>.2} ',end='',file=fp)
                     else:
                         print('0.0 ',end='',file=fp)
                     if iz % 6 == 5:

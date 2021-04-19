@@ -634,7 +634,7 @@ def create_cube_file(species,x,y,z,STO_matrix,STO_dict,filename='test.cube',cube
                 print(file=fp)
 
 
-def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict):
+def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict,phase=None,preview='test.cube'):
     if isinstance(frag1_AOM_file,dict)==True:
         frag1_AOM_dict=frag1_AOM_file
     else:
@@ -717,6 +717,27 @@ def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict)
                     np.array(frag1.STO_type_array+frag2.STO_type_array, dtype=np.int32),
                     np.array(frag1.STO_mu_array+frag2.STO_mu_array),
                     np.array(STO_matrix_f1+STO_matrix_f2))
+    if phase is not None:
+        scale1, scale2 = phase
+        cube_STO_matrix_f1 = []
+        for i in STO_matrix_f1:
+            row = []
+            for j in i:
+                row.append(scale1*j)
+            cube_STO_matrix_f1.append(row)
+        cube_STO_matrix_f2 = []
+        for i in STO_matrix_f2:
+            row = []
+            for j in i:
+                row.append(scale2*j)
+            cube_STO_matrix_f2.append(row)
+        create_cube_file(species,
+                         np.array(frag1.x+frag2.x),
+                         np.array(frag1.y+frag2.y),
+                         np.array(frag1.z+frag2.z),
+                         cube_STO_matrix_f1 + cube_STO_matrix_f2,
+                         AOM_dict,preview)
+    
     return Sab
 
 

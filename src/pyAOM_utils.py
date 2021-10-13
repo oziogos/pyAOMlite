@@ -5,7 +5,6 @@ import tarfile
 import time
 import math
 import numpy as np
-from scipy.spatial import cKDTree as KDTree
 from .anIres import anIres
 from .aom_overlap import AOM_overlap_calculation
 from .aom_overlap import calculate_overlap_S_matrix
@@ -24,6 +23,13 @@ class single_molecule:
         self.AOM_dict={}
         self.orb_compl_dict={}
         self.state={}
+        # species-dependent connectivity cutoff
+        AngToBohr=1.8897259886
+        tolerance = 0.10 / 2
+        ref_radius = {'H':0.330,'C':0.770,'N':0.702,'O':0.660,'F':0.611,'S':1.040}
+        self.radius = {i:(j+tolerance)*AngToBohr for i,j in ref_radius.items()}
+        self.neighbors = self.resolve_neighbors()
+        self.AOM_neighbourlist = {i: [] for i in range(self.atoms)}
 
     def angtobohr(self):
         AngToBohr=1.8897259886
@@ -117,8 +123,19 @@ class single_molecule:
             np.array(self.STO_mu_array)
         )
 
-    def resolve_pvecs(self,STO_matrix=None):
-        """Calculate normal vectors. If the STO matrix is given as input, calculate pi projection coeffs"""
+    def resolve_neighbors(self):
+        AngToBohr=1.8897259886
+        neighbors_dict = {i+1:[] for i in range(self.atoms)}
+        for i in range(self.atoms):
+            for j in range(self.atoms):
+                if i != j:
+                    r=np.linalg.norm(np.array([self.x[i],self.y[i],self.z[i]])-np.array([self.x[j],self.y[j],self.z[j]]))
+                    if r < (self.radius[self.species[i]] + self.radius[self.species[j]])/AngToBohr:
+                        neighbors_dict[i+1].append(j+1)
+        return neighbors_dict
+        
+    def resolve_pvecs(self, neighbors_dict=None):
+        """Calculate normal vectors. If the neighbors dict is given as input, bypass the neighbors calculation"""
         # convert ang to bohr
         self.angtobohr()
         # initialize normal vector components list
@@ -129,53 +146,108 @@ class single_molecule:
             if i!='H':
                 aoinum+=1
                 atomlist.append(j)
-
-        coordinates = np.hstack([
-            np.array(self.x)[:, None], np.array(self.y)[:, None],
-            np.array(self.z)[:, None]
-        ])
-        tree = KDTree(coordinates)
-        query = tree.query_ball_point(coordinates, r=3.5)
-
-        for i in range(len(atomlist)):
-            neighbourlist=[[0 for j in range(4)] for i in range(4)]
-            j=0
-            for k in sorted(query[atomlist[i]]):
-                if atomlist[i] != k:
-                    neighbourlist[0][j]=k+1
-                    neighbourlist[1][j]=self.x[k]
-                    neighbourlist[2][j]=self.y[k]
-                    neighbourlist[3][j]=self.z[k]
-                    j+=1
-            if j==2:
-                neighbourlist[0][2]=atomlist[i]+1
-                neighbourlist[1][2]=self.x[atomlist[i]]
-                neighbourlist[2][2]=self.y[atomlist[i]]
-                neighbourlist[3][2]=self.z[atomlist[i]]
-            if j==1:
-                # use as a second column entry the only 1-2 neighbor
-                neighbourlist[0][1]=atomlist[i]+1
-                neighbourlist[1][1]=self.x[atomlist[i]]
-                neighbourlist[2][1]=self.y[atomlist[i]]
-                neighbourlist[3][1]=self.z[atomlist[i]]
-                for k in sorted(query[neighbourlist[0][0] - 1]):
-                    if neighbourlist[0][0]!=k+1 and neighbourlist[0][1]!=k+1:
-                        neighbourlist[0][2]=k+1
-                        neighbourlist[1][2]=self.x[k]
-                        neighbourlist[2][2]=self.y[k]
-                        neighbourlist[3][2]=self.z[k]
-                        break
-            veca_x,veca_y,veca_z=[neighbourlist[i][0]-neighbourlist[i][2] for i in [1,2,3]]
-            vecb_x,vecb_y,vecb_z=[neighbourlist[i][1]-neighbourlist[i][2] for i in [1,2,3]]
-            u_x = veca_y * vecb_z - veca_z * vecb_y
-            u_y = veca_z * vecb_x - veca_x * vecb_z
-            u_z = veca_x * vecb_y - veca_y * vecb_x
-            mag_u = (u_x**2 + u_y**2 + u_z**2)**0.5
-            u = u_x / mag_u, u_y / mag_u, u_z / mag_u
-            self.px[atomlist[i]],self.py[atomlist[i]],self.pz[atomlist[i]] = u
-        if STO_matrix is not None:
-            return [self.px[j]*i[1]+self.py[j]*i[2]+self.pz[j]*i[3] for j,i in enumerate(STO_matrix)]
-
+        if neighbors_dict is None:
+            for i in atomlist:
+                neighbourlist=[[0 for j in range(4)] for i in range(4)]
+                j=0
+                for k in range(self.atoms):
+                    if i!=k:
+                        r=np.linalg.norm(np.array([self.x[i],self.y[i],self.z[i]])-np.array([self.x[k],self.y[k],self.z[k]]))
+                        if r < self.radius[self.species[i]] + self.radius[self.species[k]]:
+                            neighbourlist[0][j]=k+1
+                            neighbourlist[1][j]=self.x[k]
+                            neighbourlist[2][j]=self.y[k]
+                            neighbourlist[3][j]=self.z[k]
+                            j+=1
+                if j==2:
+                    neighbourlist[0][2]=i+1
+                    neighbourlist[1][2]=self.x[i]
+                    neighbourlist[2][2]=self.y[i]
+                    neighbourlist[3][2]=self.z[i]
+                if j==1:
+                    # use as a second column entry the only 1-2 neighbor
+                    neighbourlist[0][1]=i+1
+                    neighbourlist[1][1]=self.x[i]
+                    neighbourlist[2][1]=self.y[i]
+                    neighbourlist[3][1]=self.z[i]
+                    for k in range(self.atoms):
+                        if neighbourlist[0][0]!=k+1 and neighbourlist[0][1]!=k+1:
+                            r=np.linalg.norm(np.array([self.x[neighbourlist[0][0]-1],self.y[neighbourlist[0][0]-1],self.z[neighbourlist[0][0]-1]])-np.array([self.x[k],self.y[k],self.z[k]]))
+                            if r < self.radius[self.species[neighbourlist[0][0]-1]] + self.radius[self.species[k]]:
+                                neighbourlist[0][2]=k+1
+                                neighbourlist[1][2]=self.x[k]
+                                neighbourlist[2][2]=self.y[k]
+                                neighbourlist[3][2]=self.z[k]
+                                break
+                veca_x,veca_y,veca_z=[neighbourlist[i][0]-neighbourlist[i][2] for i in [1,2,3]]
+                vecb_x,vecb_y,vecb_z=[neighbourlist[i][1]-neighbourlist[i][2] for i in [1,2,3]]
+                if self.is_collinear(veca_x,veca_y,veca_z,vecb_x,vecb_y,vecb_z) == False:
+                    u_x = veca_y * vecb_z - veca_z * vecb_y
+                    u_y = veca_z * vecb_x - veca_x * vecb_z
+                    u_z = veca_x * vecb_y - veca_y * vecb_x
+                    mag_u = (u_x**2 + u_y**2 + u_z**2)**0.5
+                    u = u_x / mag_u, u_y / mag_u, u_z / mag_u
+                else:
+                    u = [0,0,0]
+                    neigh_seq = self.resolve_central_neighbors(i+1,self.neighbors)                
+                    neighbourlist=[[0 for j in range(4)] for i in range(4)]
+                    atom_1 = i+1
+                    neighbourlist[0][0]=atom_1
+                    neighbourlist[1][0]=self.x[atom_1-1]
+                    neighbourlist[2][0]=self.y[atom_1-1]
+                    neighbourlist[3][0]=self.z[atom_1-1]
+                    atom_2 = neigh_seq[0]
+                    neighbourlist[0][1]=atom_2
+                    neighbourlist[1][1]=self.x[atom_2-1]
+                    neighbourlist[2][1]=self.y[atom_2-1]
+                    neighbourlist[3][1]=self.z[atom_2-1]
+                    for atom_3 in neigh_seq[1:]:
+                        neighbourlist[0][2]=atom_3
+                        neighbourlist[1][2]=self.x[atom_3-1]
+                        neighbourlist[2][2]=self.y[atom_3-1]
+                        neighbourlist[3][2]=self.z[atom_3-1]
+                        veca_x,veca_y,veca_z=[neighbourlist[i][0]-neighbourlist[i][2] for i in [1,2,3]]
+                        vecb_x,vecb_y,vecb_z=[neighbourlist[i][1]-neighbourlist[i][2] for i in [1,2,3]]
+                        if self.is_collinear(veca_x,veca_y,veca_z,vecb_x,vecb_y,vecb_z) == False:
+                            u_x = veca_y * vecb_z - veca_z * vecb_y
+                            u_y = veca_z * vecb_x - veca_x * vecb_z
+                            u_z = veca_x * vecb_y - veca_y * vecb_x
+                            mag_u = (u_x**2 + u_y**2 + u_z**2)**0.5
+                            u = u_x / mag_u, u_y / mag_u, u_z / mag_u
+                            break        
+                self.AOM_neighbourlist[i] = [neighbourlist[0][i] for i in range(4)]
+                self.px[i],self.py[i],self.pz[i] = u
+        else:
+            for i in atomlist:
+                neighbourlist=[[0 for j in range(4)] for i in range(4)]
+                neighbourlist[0] = neighbors_dict[i]
+                for c,atom in enumerate(neighbourlist[0]):
+                    neighbourlist[1][c] = self.x[atom - 1]
+                    neighbourlist[2][c] = self.y[atom - 1]
+                    neighbourlist[3][c] = self.z[atom - 1]
+                veca_x,veca_y,veca_z=[neighbourlist[i][0]-neighbourlist[i][2] for i in [1,2,3]]
+                vecb_x,vecb_y,vecb_z=[neighbourlist[i][1]-neighbourlist[i][2] for i in [1,2,3]]
+                u_x = veca_y * vecb_z - veca_z * vecb_y
+                u_y = veca_z * vecb_x - veca_x * vecb_z
+                u_z = veca_x * vecb_y - veca_y * vecb_x
+                mag_u = (u_x**2 + u_y**2 + u_z**2)**0.5
+                u = u_x / mag_u, u_y / mag_u, u_z / mag_u
+                self.px[i],self.py[i],self.pz[i] = u
+                
+    def resolve_central_neighbors(self,start,neigh_dict):
+        n = neigh_dict[start].copy()
+        for i in n:
+            for j in neigh_dict[i]:
+                if j not in n and j != start:
+                    n.append(j)
+        return n
+        
+    def is_collinear(self,veca_x,veca_y,veca_z,vecb_x,vecb_y,vecb_z,tol=1.0):
+        mag_veca = (veca_x**2 + veca_y**2 + veca_z**2)**0.5
+        mag_vecb = (vecb_x**2 + vecb_y**2 + vecb_z**2)**0.5
+        cos = (veca_x * vecb_x + veca_y * vecb_y + veca_z * vecb_z)/(mag_veca * mag_vecb)
+        return math.acos(cos)*180/math.pi > 180 - tol or 0 <= math.acos(cos)*180/math.pi < tol
+        
     def project(self):
         self.STO_matrix,self.orb_compl,self.V_array=STO_GTO_projection(self.x,self.y,self.z,
                                         self.STO_id_array,self.STO_type_array,self.STO_mu_array,
@@ -191,11 +263,14 @@ class single_molecule:
     def save_AOM(self,label):
         with open(f'output/{label}/AOM_COEFF.dat',mode='w') as fp:
             print(self.AOM_dict,file=fp)
+        with open(f'output/{label}/AOM_NEIGH.dat',mode='w') as fp:
+            print(self.AOM_neighbourlist,file=fp)
 
     def save_state(self,label,to_file=True):
         self.state['pvecs']={'px':list(self.px),'py':list(self.py),'pz':list(self.pz)}
         self.state['S_matrix']=[[j for j in i] for i in self.Smatrix]
         self.state['AOM_dict']=self.AOM_dict
+        self.state['NEIGH_dict']=self.AOM_neighbourlist
         self.state['V_array']=self.V_array
         self.state['compl_dict']=self.orb_compl_dict
         self.state['STO_matrix']=self.STO_matrix
@@ -634,7 +709,7 @@ def create_cube_file(species,x,y,z,STO_matrix,STO_dict,filename='test.cube',cube
                 print(file=fp)
 
 
-def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict,phase=None,preview='test.cube'):
+def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_NEIGH_file,frag2_NEIGH_file,frag1_MO,frag2_MO,AOM_dict,phase=None,preview='test.cube'):
     if isinstance(frag1_AOM_file,dict)==True:
         frag1_AOM_dict=frag1_AOM_file
     else:
@@ -647,6 +722,18 @@ def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict,
         with open(frag2_AOM_file) as fp:
             data=fp.read()
             frag2_AOM_dict=ast.literal_eval(data)
+    if isinstance(frag1_NEIGH_file,dict)==True:
+        frag1_NEIGH_dict=frag1_NEIGH_file
+    else:
+        with open(frag1_NEIGH_file) as fp:
+            data=fp.read()
+            frag1_NEIGH_dict=ast.literal_eval(data)
+    if isinstance(frag2_NEIGH_file,dict)==True:
+        frag2_NEIGH_dict=frag1_NEIGH_file
+    else:
+        with open(frag2_NEIGH_file) as fp:
+            data=fp.read()
+            frag2_NEIGH_dict=ast.literal_eval(data)
     frag1atoms=len(frag1_AOM_dict[frag1_MO])
     if isinstance(dimer_xyz_file,str):
         fp=open(dimer_xyz_file)
@@ -662,8 +749,8 @@ def Sab(dimer_xyz_file,frag1_AOM_file,frag2_AOM_file,frag1_MO,frag2_MO,AOM_dict,
     frag2=single_molecule(None,'variable',[species[frag1atoms::],x[frag1atoms::],y[frag1atoms::],z[frag1atoms::]])
     frag1.initialize_STOs(AOM_dict)
     frag2.initialize_STOs(AOM_dict)
-    frag1.resolve_pvecs()
-    frag2.resolve_pvecs()
+    frag1.resolve_pvecs(frag1_NEIGH_dict)
+    frag2.resolve_pvecs(frag2_NEIGH_dict)
     STO_matrix_f1=resolve_STO_matrix(frag1atoms,frag1.STOs,frag1.STO_id_array,frag1.STO_type_array,frag1.px,frag1.py,frag1.pz,frag1_AOM_dict[frag1_MO])
     STO_matrix_f2=resolve_STO_matrix(frag2atoms,frag2.STOs,frag2.STO_id_array,frag2.STO_type_array,frag2.px,frag2.py,frag2.pz,frag2_AOM_dict[frag2_MO])
     S_f1=AOM_overlap_calculation(0,frag1.STOs,
@@ -812,6 +899,8 @@ def overlap_reg_test(ref_data_init,AOM_dict,atol=1.0e-6,target=None):
             val=Sab((value['dimers'][dimer]['species'],value['dimers'][dimer]['x'],value['dimers'][dimer]['y'],value['dimers'][dimer]['z']),
                     {int(i):j for i,j in value['AOM_dict'].items()},
                     {int(i):j for i,j in value['AOM_dict'].items()},
+                    {int(i):j for i,j in value['NEIGH_dict'].items()},
+                    {int(i):j for i,j in value['NEIGH_dict'].items()},
                     int(list(value['AOM_dict'].keys())[0]),
                     int(list(value['AOM_dict'].keys())[0]),
                     AOM_dict)

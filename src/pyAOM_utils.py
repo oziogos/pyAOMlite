@@ -242,7 +242,7 @@ class single_molecule:
                     n.append(j)
         return n
         
-    def is_collinear(self,veca_x,veca_y,veca_z,vecb_x,vecb_y,vecb_z,tol=1.0):
+    def is_collinear(self,veca_x,veca_y,veca_z,vecb_x,vecb_y,vecb_z,tol=5.0):
         mag_veca = (veca_x**2 + veca_y**2 + veca_z**2)**0.5
         mag_vecb = (vecb_x**2 + vecb_y**2 + vecb_z**2)**0.5
         cos = (veca_x * vecb_x + veca_y * vecb_y + veca_z * vecb_z)/(mag_veca * mag_vecb)
